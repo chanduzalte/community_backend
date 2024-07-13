@@ -1,0 +1,8 @@
+1. Start by cloning the project from the repository to your local machine.
+2. Open a terminal or command prompt and navigate to the project's root directory.
+3. Run the command `npm install` to install all the necessary dependencies for the project.
+4. Next, you need to set up the environment variables. Open the `.env` file and add the required variables as mentioned in the `sample.env` file.
+5. After setting up the environment variables, run the command `npm run dev` in the terminal to start the project.
+6. To connect to the database, either go to MongoDB Atlas or use MongoDB Compass. Follow the respective documentation to set up a connection.
+7. Once connected, create a collection named `settings` in the database. Import the `settings.json` (provided in project_setup folder) file into this collection.
+8. Similarly, create another collection named `levelprices` and import the `levelprices.json` (provided in project_setup folder) file into it.

@@ -1,0 +1,53 @@
+# Node.js and Express
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+jspm_packages/
+
+# Debugging tools
+.vscode/
+.idea/
+
+# Editor directories
+.svscode/
+.idea/
+
+# Output of 'npm pack'
+*.tgz
+
+# Mac-specific
+.DS_Store
+
+# Windows-specific
+Thumbs.db
+
+# ESLint
+.eslintcache
+
+# Config files
+*.config.js
+
+# Environment variables
+.env
+
+# Ignore postman files
+*.postman_environment.json
+*.postman_collection.json
+
+#package-lock
+package-lock.json
+.vercel
+uploads/
