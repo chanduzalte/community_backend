@@ -16,7 +16,6 @@ mongoose.connect(process.env.MONGO_URI, {
 app.use('/uploads', express.static('uploads'));
 
 
-//DEMO
 
 const corsOptions = {
   origin: process.env.CORS_URL,

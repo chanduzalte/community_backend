@@ -14,5 +14,8 @@ router.post("/change-status", jwtAuthMiddleware, memberController.changeMemberSt
 router.post("/update/:id", jwtAuthMiddleware, memberController.updateMember);
 router.post("/update-gh/:id", jwtAuthMiddleware, memberController.updateGH);
 router.get("/gh/:id", jwtAuthMiddleware, memberController.fetchGetHelps);
+router.post("/add-note", jwtAuthMiddleware, memberController.addNote);
+router.get("/pin-enquiries", jwtAuthMiddleware, memberController.getPinEnquiries);
+router.post("/sendPin", jwtAuthMiddleware, memberController.sendPins);
 
 module.exports = router;

@@ -1,3 +1,5 @@
+const { default: mongoose } = require("mongoose");
+const { TRANSACTION_TYPES } = require("../helpers/types");
 
 const transactionSchema = new mongoose.Schema({
     qty: {
@@ -6,7 +8,7 @@ const transactionSchema = new mongoose.Schema({
     },
     narration: {
         type: String,
-        required: true,
+        required: false,
     },
     recipient: {
         type: mongoose.Schema.Types.ObjectId,
@@ -27,7 +29,7 @@ const transactionSchema = new mongoose.Schema({
         default: false,
     },
     transactionType: {
-        enum: ["buy", "transfer", "free", "token"],
+        enum: [TRANSACTION_TYPES.BUY, TRANSACTION_TYPES.TRANSFER, TRANSACTION_TYPES.FREE, TRANSACTION_TYPES.ID_CREATE, TRANSACTION_TYPES.REDEEM],
         type: String,
         required: true,
     },

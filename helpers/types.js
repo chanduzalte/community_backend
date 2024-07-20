@@ -14,15 +14,31 @@ const VIDEO_KYC_STATUS = {
 }
 
 const MEMBER_STAGE = {
-    NEW: 'NEW',
-    SLIVER: 'SLIVER',
-    GOLD: 'GOLD',
-    DIAMOND: 'DIAMOND',
-    PLATINUM: 'PLATINUM',
+    NEW: 'NEW',             // After Registration
+    SILVER: 'SILVER',       // After Video KYC && 1SH Approveds
+    GOLD: 'GOLD',           // After 5+ Silver
+    PLATINUM: 'PLATINUM',   // After 20+ Silver
+    LEADER: 'LEADER',       // After 50+ Silver
+    DIAMOND: 'DIAMOND',     // After 5+ Leader
+}
+
+const PIN_STATUS = {
+    REQUESTED: 'REQUESTED',
+    SENT: 'SENT',
+}
+
+const TRANSACTION_TYPES = {
+    BUY: 'BUY',
+    TRANSFER: 'TRANSFER',
+    FREE: 'FREE',
+    ID_CREATE: 'ID_CREATE',
+    REDEEM: "REDEEM"
 }
 
 module.exports = {
     SH_GH_TYPES,
     VIDEO_KYC_STATUS,
-    MEMBER_STAGE
+    MEMBER_STAGE,
+    PIN_STATUS,
+    TRANSACTION_TYPES
 }

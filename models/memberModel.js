@@ -14,12 +14,38 @@ const memberSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
+  image1: {
+    type: String,
+    default: "profile_image_url_here",
+    required: true,
+  },
+  image2: {
+    type: String,
+    default: "profile_image_url_here",
+    required: true,
+  },
   mobile: {
     type: Number,
     required: false,
   },
+  mobileMasked: {
+    type: Boolean,
+    required: false,
+  },
+  note: {
+    type: String,
+    required: false,
+  },
   upiId: {
     type: String,
+    required: false,
+  },
+  gPay: {
+    type: Number,
+    required: false,
+  },
+  phonePe: {
+    type: Number,
     required: false,
   },
   passcode: {
@@ -76,7 +102,7 @@ const memberSchema = new mongoose.Schema({
       },
     }
   },
-  isSliver: {
+  isSilver: {
     type: Boolean,
     default: false,
   },
@@ -84,56 +110,37 @@ const memberSchema = new mongoose.Schema({
     type: String,
     enum: [
       MEMBER_STAGE.NEW,
-      MEMBER_STAGE.SLIVER,
+      MEMBER_STAGE.SILVER,
       MEMBER_STAGE.GOLD,
-      MEMBER_STAGE.DIAMOND,
       MEMBER_STAGE.PLATINUM,
+      MEMBER_STAGE.LEADER,
+      MEMBER_STAGE.DIAMOND,
     ],
     default: MEMBER_STAGE.NEW,
   },
+  teamCount: {
+    type: Number,
+    default: 0,
+    required: false,
+  },
+  silverCount: {
+    type: Number,
+    default: 0,
+    required: false,
+  },
   levels: {
-    1: [
+    type: Map,
+    of: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Member",
       },
     ],
-    2: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Member",
-      },
-    ],
-    3: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Member",
-      },
-    ],
-    4: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Member",
-      },
-    ],
-    5: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Member",
-      },
-    ],
-    6: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Member",
-      },
-    ],
-    7: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Member",
-      },
-    ],
+    default: new Map(),
+  },
+  loginAttempts: {
+    type: Number,
+    default: 0,
   },
   tags: [
     {

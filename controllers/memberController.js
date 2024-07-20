@@ -3,9 +3,12 @@ const bcrypt = require("bcrypt");
 const Member = require("../models/memberModel");
 const MemberToken = require("../models/memberTokenModel")
 const moment = require("moment");
-const { SH_GH_TYPES, VIDEO_KYC_STATUS } = require("../helpers/types");
+const { SH_GH_TYPES, VIDEO_KYC_STATUS, MEMBER_STAGE, TRANSACTION_TYPES, PIN_STATUS } = require("../helpers/types");
 const LevelPrice = require("../models/levelPrice");
 const LevelIncome = require("../models/levelIncomeModel");
+const PinEnquiry = require("../models/pinEnquiryModel");
+const Settings = require("../models/settings");
+const Transaction = require("../models/transactionModel");
 
 class CustomerController {
 
@@ -31,15 +34,31 @@ class CustomerController {
             // Calculate the number of documents to skip based on the page and limit
             const skip = (page - 1) * limit;
 
+            if(type === "incompleteRegistration"){
+                const members = await Member.find({
+                    fname: null,
+                    lname: null,
+                    passcode: null
+                }).skip(skip).limit(limit).sort({ createdAt: -1 }).exec();
+                const totalMembers = await Member.find({
+                    fname: null,
+                    lname: null,
+                    passcode: null
+                }).countDocuments();
+                return res.json({ members, totalMembers });
+            }
+
             const members = type === "videoKYC" ? 
             await Member.find({ 
                 profileImage: { $ne: null },
                 "videoKYC.status": VIDEO_KYC_STATUS.PENDING,
-                "videoKYC.url": { $ne: null, $ne: "default_video_kyc_url"}
+                "videoKYC.url": { $ne: null, $ne: "default_video_kyc_url"},
+                isRegistered: true
             }).populate("referredBy").exec()
             :
             await Member.find({
-                isAdmin: false
+                isAdmin: false,
+                isRegistered: true
             }).skip(skip).limit(limit).sort({ createdAt: -1 })
                 .exec();
 
@@ -47,7 +66,8 @@ class CustomerController {
             await Member.find({ 
                 profileImage: { $ne: null },
                 "videoKYC.status": VIDEO_KYC_STATUS.PENDING,
-                "videoKYC.url": { $ne: null , $ne: "default_video_kyc_url"}
+                "videoKYC.url": { $ne: null , $ne: "default_video_kyc_url"},
+                isRegistered: true
             }).countDocuments()
             :
             await Member.find({ isAdmin: false }).countDocuments();
@@ -248,8 +268,12 @@ class CustomerController {
                         sendHelp: { $ne: null },
                         "sendHelp.status": SH_GH_TYPES.COMPLETED
                     }).countDocuments();
-                    if(count >= 1)
-                        member.isSliver = true;
+                    if(count >= 1){
+                        member.isSilver = true;
+                        member.stage = checkStatus(member.silverCount);
+                        await member.save();
+                        await silverTrigger(Id, member?.referredBy);
+                    }
                 }
             }
             
@@ -259,6 +283,24 @@ class CustomerController {
 
         } catch (error) {
             console.log("Member status update error", error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
+
+    async addNote(req, res) {
+        try {
+            const { Id, Note } = await req.body;
+            const member = await Member.findById(Id);
+            if(!member){
+                return res.status(404).json({ message: "Member not found" });
+            }
+
+            member.note = Note;
+            await member.save();
+
+            res.status(200).json({ message: "Note added" });
+        } catch (error) {
+            console.log("Note add error", error);
             res.status(500).json({ message: 'Internal Server Error' });
         }
     }
@@ -339,8 +381,8 @@ class CustomerController {
 
     async updateGH(req, res) {
         try {
-            const memberId = req.params.id;
-            const memberToken = await MemberToken.findById(memberId).populate("memberId")
+            const tokenId = req.params.id;
+            const memberToken = await MemberToken.findById(tokenId).populate("memberId");
             if (!memberToken) {
                 return res.status(404).json({ message: "Member Token not found" });
             }
@@ -355,7 +397,20 @@ class CustomerController {
             await memberToken.save();
 
             if(status === SH_GH_TYPES.COMPLETED){
-                await distributeIncome(memberToken._id, memberToken?.memberId?.referredBy)
+                await distributeIncome(memberToken._id, memberToken?.memberId?.referredBy);
+
+                const count = await MemberToken.find({
+                    memberId: memberToken?.memberId?._id,
+                    sendHelp: { $ne: null },
+                    "sendHelp.status": SH_GH_TYPES.COMPLETED
+                }).countDocuments();
+                const member = await Member.findById(memberToken?.memberId?._id);
+                if(member?.videoKYC?.status === VIDEO_KYC_STATUS.APPROVED && count === 1){
+                    member.isSilver = true;  
+                    member.stage = MEMBER_STAGE.SILVER;
+                    await member.save();
+                    await silverTrigger(member?._id, member?.referredBy);
+                }
             }
 
             res.json({ message: "Member Token updated" });
@@ -364,7 +419,53 @@ class CustomerController {
             console.log(error);
             res.status(500).json({ message: 'Internal Server Error' });
         }
-    }   
+    } 
+    
+    async getPinEnquiries(req, res) {
+        try {
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 10; // Default limit is 10'
+            const type = req.query.type || "pinEnquiries";
+
+            const skip = (page - 1) * limit;
+
+            const members = await PinEnquiry.find().skip(skip).limit(limit).sort({ createdAt: -1 }).populate("requestedBy").exec()
+            const totalMembers = await PinEnquiry.find().countDocuments();
+            res.json({ members, totalMembers });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
+
+    async sendPins(req, res) {
+        try {
+            const {id, memberId, qty} = await req.body;
+            const member = await Member.findById(memberId);
+            if(!member){
+                return res.status(404).json({ message: "Member not found" });
+            }
+            member.epinBalance += qty;
+            await member.save();
+            await PinEnquiry.findByIdAndUpdate(id, { status: PIN_STATUS.SENT });
+
+            const ePinPrice = await Settings.findOne({ key: "ePinPrice" }).lean();
+            const price = ePinPrice?.value[0]?.value || 10;
+
+            await Transaction.create({
+                qty,
+                recipient: memberId,
+                transactionType: TRANSACTION_TYPES.BUY,
+                totalAmount: qty * price,
+                sentByAdmin: true
+            });
+            
+            res.status(200).json({ message: "Pins sent" });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }       
+    }
 }
 
 module.exports = new CustomerController();
@@ -400,3 +501,46 @@ const distributeIncome = async (sourceToken, referredBy) => {
     console.log(error);
   }
 };
+
+
+const silverTrigger = async (memberId, referredBy) => {
+    try {
+        let referreingMember = await Member.findById(referredBy);
+
+        // 1] Change Parent's rank
+        while(referreingMember){
+            const silverCount = (referreingMember?.silverCount || 0) + 1;
+            let status = MEMBER_STAGE.NEW;
+            if(referreingMember.isSilver){
+                status = checkStatus(silverCount);
+            }
+            referreingMember.silverCount = silverCount;
+            referreingMember.stage = status;
+            await referreingMember.save();
+            referreingMember = await Member.findById(referreingMember?.referredBy);
+        }
+
+        // 2] Change Self's rank
+        const member = await Member.findById(memberId);
+        if(member.isSilver){
+            member.stage = checkStatus(member.silverCount);
+            await member.save();
+        }
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+const checkStatus = (count) => {
+    if(count >= 250){
+        return MEMBER_STAGE.DIAMOND;
+    } else if(count >= 50){
+        return MEMBER_STAGE.LEADER;
+    } else if(count >= 20){
+        return MEMBER_STAGE.PLATINUM;
+    } else if(count >= 5){
+        return MEMBER_STAGE.GOLD;
+    } else {
+        return MEMBER_STAGE.SILVER;
+    }
+}
