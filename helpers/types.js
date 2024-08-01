@@ -35,10 +35,18 @@ const TRANSACTION_TYPES = {
     REDEEM: "REDEEM"
 }
 
+
+const INCOME_TYPES = {
+    LEVEL: 'LEVEL',
+    CATEGORY: 'CATEGORY',
+}
+
+
 module.exports = {
     SH_GH_TYPES,
     VIDEO_KYC_STATUS,
     MEMBER_STAGE,
     PIN_STATUS,
-    TRANSACTION_TYPES
+    TRANSACTION_TYPES,
+    INCOME_TYPES
 }

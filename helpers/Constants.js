@@ -9,4 +9,13 @@ const CONSTANTS = {
     }
 }
 
-module.exports = CONSTANTS;
+const categoryPrices = {
+    [MEMBER_STAGE.DIAMOND]: 5,
+    [MEMBER_STAGE.LEADER]: 3,
+    [MEMBER_STAGE.PLATINUM]: 1,
+}
+
+module.exports = {
+    CONSTANTS,
+    categoryPrices
+}

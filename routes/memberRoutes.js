@@ -17,5 +17,6 @@ router.get("/gh/:id", jwtAuthMiddleware, memberController.fetchGetHelps);
 router.post("/add-note", jwtAuthMiddleware, memberController.addNote);
 router.get("/pin-enquiries", jwtAuthMiddleware, memberController.getPinEnquiries);
 router.post("/sendPin", jwtAuthMiddleware, memberController.sendPins);
+router.post("/unlock-freepin", jwtAuthMiddleware, memberController.unlockFreePin);
 
 module.exports = router;

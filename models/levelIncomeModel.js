@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Member = require("./memberModel");
 const MemberToken = require("./memberTokenModel");
+const { INCOME_TYPES } = require("../helpers/types");
 
 const levelModelSchema = new mongoose.Schema(
   {
@@ -20,6 +21,11 @@ const levelModelSchema = new mongoose.Schema(
     },
     amount: {
       type: Number,
+      required: true,
+    },
+    type: {
+      type: String,
+      enum: [INCOME_TYPES.LEVEL, INCOME_TYPES.CATEGORY],
       required: true,
     },
   },

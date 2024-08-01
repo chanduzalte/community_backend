@@ -1,8 +1,50 @@
-1. Start by cloning the project from the repository to your local machine.
-2. Open a terminal or command prompt and navigate to the project's root directory.
-3. Run the command `npm install` to install all the necessary dependencies for the project.
-4. Next, you need to set up the environment variables. Open the `.env` file and add the required variables as mentioned in the `sample.env` file.
-5. After setting up the environment variables, run the command `npm run dev` in the terminal to start the project.
-6. To connect to the database, either go to MongoDB Atlas or use MongoDB Compass. Follow the respective documentation to set up a connection.
-7. Once connected, create a collection named `settings` in the database. Import the `settings.json` (provided in project_setup folder) file into this collection.
-8. Similarly, create another collection named `levelprices` and import the `levelprices.json` (provided in project_setup folder) file into it.
+### Project Setup Instructions
+
+1. Clone the Repository:
+    - Clone the project from the repository to your local machine using the following command:
+      git clone <repository-url>
+
+2. Navigate to Project Directory:
+    - Open a terminal or command prompt and navigate to the project's root directory:
+      cd <project-directory>
+
+3. Install Dependencies:
+    - Run the following command to install all the necessary dependencies for the project:
+      npm install
+
+4. Set Up Environment Variables:
+    - Open the `.env` file in the project root directory.
+    - Add the required variables as mentioned in the `sample.env` file.
+
+5. Start the Project:
+    - Run the following command in the terminal to start the project:
+      npm run start
+
+6. Connect to the Database:
+    - Use either MongoDB Atlas or MongoDB Compass to set up a connection to your MongoDB database. Follow the respective documentation for detailed instructions.
+
+7. Create and Populate Collections:
+    - Create `settings` Collection:
+        - If the `settings` collection does not already exist, create it.
+        - Import the `settings.json` file (located in the `project_setup` folder) into this collection if already not present.
+
+    - Create `levelprices` Collection:
+        - Create a `levelprices` collection if it does not already exist.
+        - Import the `levelprices.json` file (located in the `project_setup` folder) into this collection if already not present.
+
+    - Create `members` Collection:
+        - Create a `members` collection if it does not already exist.
+        - Import the `members.json` file (located in the `project_setup` folder) into this collection.
+        - This member will be your admin. Default password is `112233` and the mobile number is `6110011001` if already not present.
+        - Add this member's `_id` to the `.env` file as `ADMIN_ID`.
+        - Go to membertokens collection in database and copy the `_id` of the token created for the admin. Add this token ID to the `.env` file as `ADMIN_TOKEN_ID`.
+    
+    - Create `daytabels` Collection:
+        - Create a `daytables` collection if it does not already exist.
+        - Import the `daytables.json` file (located in the `project_setup` folder) into this collection if already not present.
+
+    - Create `users` Collection:
+        - Create a `users` collection in the database.
+        - Import the `users.json` file (located in the `project_setup` folder) into this collection.
+        - This user will be your admin user with the default email `johndoe@gmail.com` and password `1`.
+        - You can login using these credentials into admin panel. ( This user is different from the admin member created in the `members` collection. )

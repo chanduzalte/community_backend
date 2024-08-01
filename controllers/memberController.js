@@ -3,12 +3,13 @@ const bcrypt = require("bcrypt");
 const Member = require("../models/memberModel");
 const MemberToken = require("../models/memberTokenModel")
 const moment = require("moment");
-const { SH_GH_TYPES, VIDEO_KYC_STATUS, MEMBER_STAGE, TRANSACTION_TYPES, PIN_STATUS } = require("../helpers/types");
+const { SH_GH_TYPES, VIDEO_KYC_STATUS, MEMBER_STAGE, TRANSACTION_TYPES, PIN_STATUS, INCOME_TYPES } = require("../helpers/types");
 const LevelPrice = require("../models/levelPrice");
 const LevelIncome = require("../models/levelIncomeModel");
 const PinEnquiry = require("../models/pinEnquiryModel");
 const Settings = require("../models/settings");
 const Transaction = require("../models/transactionModel");
+const { categoryPrices } = require("../helpers/Constants");
 
 class CustomerController {
 
@@ -46,6 +47,27 @@ class CustomerController {
                     passcode: null
                 }).countDocuments();
                 return res.json({ members, totalMembers });
+            } else if(type === "videoKYCCompleted"){
+                const members = await Member.find({
+                    "videoKYC.status": VIDEO_KYC_STATUS.APPROVED,
+                    isRegistered: true
+                }).skip(skip).limit(limit).sort({ createdAt: -1 }).populate("referredBy").exec();
+                console.log(members);
+                const totalMembers = await Member.find({
+                    "videoKYC.status": VIDEO_KYC_STATUS.APPROVED,
+                    isRegistered: true
+                }).countDocuments();
+                return res.json({ members, totalMembers });
+            } else if(type === "freePinRequest"){
+                const members = await Member.find({
+                    freePinImage: { $ne: null, $ne: "default_free_pin_image_url" },
+                    isFollowed: false
+                }).skip(skip).limit(limit).sort({ createdAt: -1 }).populate("referredBy").exec();
+                const totalMembers = await Member.find({
+                    freePinImage: { $ne: null, $ne: "default_free_pin_image_url" },
+                    isFollowed: false
+                }).countDocuments();
+                return res.json({ members, totalMembers });
             }
 
             const members = type === "videoKYC" ? 
@@ -70,7 +92,7 @@ class CustomerController {
                 isRegistered: true
             }).countDocuments()
             :
-            await Member.find({ isAdmin: false }).countDocuments();
+            await Member.find({ isAdmin: false, isRegistered: true }).countDocuments();
 
             res.json({ members, totalMembers });
 
@@ -466,12 +488,43 @@ class CustomerController {
             res.status(500).json({ message: 'Internal Server Error' });
         }       
     }
+
+    async unlockFreePin(req, res) {
+        try {
+            const { memberId } = await req.body;
+            const member = await Member.findById(memberId);
+            if(!member){
+                return res.status(404).json({ message: "Member not found" });
+            }
+            
+            const ePinPrice = await Settings.findOne({ key: 'Epin' });
+            const price = ePinPrice?.value?.[0]?.value;
+            
+            await Transaction.create({
+                qty: 1,
+                recipient: member._id,
+                transactionType: TRANSACTION_TYPES.FREE,
+                totalAmount: price,
+                sentByAdmin: true 
+            });
+            
+            member.isFollowed = true;
+            member.epinBalance += 1;
+            
+            await member.save();
+            res.status(200).json({ message: "Free pin unlocked" });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
 }
 
 module.exports = new CustomerController();
 
 const distributeIncome = async (sourceToken, referredBy) => {
   try {
+    const temp = referredBy;
     const levelPrice = await LevelPrice.findOne({}).lean();
     for (let i = 1; i < 7; i++) {
       if (!referredBy) break;
@@ -481,6 +534,7 @@ const distributeIncome = async (sourceToken, referredBy) => {
         member: referredBy,
         level: i,
         amount: levelPrice?.price[i - 1],
+        type: INCOME_TYPES.LEVEL
       });
 
       const member = await Member.findOneAndUpdate(
@@ -497,6 +551,40 @@ const distributeIncome = async (sourceToken, referredBy) => {
 
       referredBy = member?.referredBy;
     }
+
+      let PLATINUM = false, LEADER = false, DIAMOND = false;
+      referredBy = temp;
+      let level = 1;
+      while (referredBy && (!PLATINUM || !LEADER || !DIAMOND)) {
+          let member = await Member.findById(referredBy).populate('referredBy');
+          const stage = member?.stage;
+          const amount = categoryPrices[stage] || 0;
+          if (stage === MEMBER_STAGE.PLATINUM) PLATINUM = true;
+          else if (stage === MEMBER_STAGE.LEADER) LEADER = true;
+          else if (stage === MEMBER_STAGE.DIAMOND) DIAMOND = true;
+
+          if (amount) {
+              if (stage === MEMBER_STAGE.PLATINUM || stage === MEMBER_STAGE.LEADER || stage === MEMBER_STAGE.DIAMOND) {
+                  await LevelIncome.create({
+                      sourceToken,
+                      member: referredBy,
+                      amount,
+                      level: level,
+                      type: INCOME_TYPES.CATEGORY
+                  });
+              }
+              member = await Member.findOneAndUpdate({
+                  _id: referredBy
+              }, {
+                  $inc: {
+                      income: amount
+                  }
+              }, { new: true });
+          }
+          referredBy = member?.referredBy;
+          level++;
+      }
+
   } catch (error) {
     console.log(error);
   }

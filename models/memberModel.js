@@ -81,6 +81,10 @@ const memberSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  freePinImage: {
+    type: String,
+    required: false,
+  },
   isAdmin: {
     type: Boolean,
     default: false,

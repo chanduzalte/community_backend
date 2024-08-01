@@ -21,11 +21,18 @@ class DashboardController {
                 "videoKYC.status": VIDEO_KYC_STATUS.PENDING
             })
 
+            const totalVideoKYCCompleted = await Member.countDocuments({
+                _id: { $ne: adminId },
+                "videoKYC.status": VIDEO_KYC_STATUS.APPROVED,
+                isRegistered: true
+            })
+
             res.status(200).json({
                 totalMembers,
                 totalIds,
                 totalGetHelpPending,
-                totalVideoKYCPending
+                totalVideoKYCPending,
+                totalVideoKYCCompleted
             });
         } catch (err) {
             res.status(500).json({ message: err });

@@ -1,0 +1,44 @@
+{
+    "profileImage": "profile_image_url_here",
+    "mobile": 6110011001,
+    "otp": 734999,
+    "otpExpires": {
+      "$date": "2024-07-10T13:41:11.700Z"
+    },
+    "isMobileVerified": true,
+    "epinBalance": 10000,
+    "isFollowed": true,
+    "isAdmin": true,
+    "videoKYC": {
+      "url": "default_video_kyc_url",
+      "status": "APPROVED"
+    },
+    "stage": "SILVER",
+    "levels": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+      "6": [],
+      "7": []
+    },
+    "status": "ACTIVE",
+    "loginAttempts": 0,
+    "income": 0,
+    "__v": 1,
+    "fname": "John",
+    "lname": "Doe",
+    "passcode": "$2b$10$f27nPjheZpsBXKkLTMnkN.xlzfuKpGxcCWGDCQbOilj.vGXwbi0oS",
+    "referralCode": "JD491381",
+    "upiId": "johndoe@sbi",
+    "mobileMasked": true,
+    "image1": "profile_image_url_here",
+    "image2": "profile_image_url_here",
+    "isSliver": true,
+    "sliverCount": 0,
+    "teamCount": 0,
+    "isSilver": true,
+    "silverCount": 0,
+    "tags": []
+}
