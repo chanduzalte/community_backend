@@ -73,7 +73,7 @@ class CustomerController {
             const members = type === "videoKYC" ? 
             await Member.find({ 
                 profileImage: { $ne: null },
-                "videoKYC.status": VIDEO_KYC_STATUS.PENDING,
+                "videoKYC.status": { $ne: VIDEO_KYC_STATUS.COMPLETED },
                 "videoKYC.url": { $ne: null, $ne: "default_video_kyc_url"},
                 isRegistered: true
             }).populate("referredBy").exec()
@@ -87,7 +87,7 @@ class CustomerController {
             const totalMembers = type === "videoKYC" ?
             await Member.find({ 
                 profileImage: { $ne: null },
-                "videoKYC.status": VIDEO_KYC_STATUS.PENDING,
+                "videoKYC.status": { $ne: VIDEO_KYC_STATUS.COMPLETED },
                 "videoKYC.url": { $ne: null , $ne: "default_video_kyc_url"},
                 isRegistered: true
             }).countDocuments()
