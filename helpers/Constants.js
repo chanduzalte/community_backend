@@ -1,3 +1,5 @@
+const { MEMBER_STAGE } = require("./types")
+
 const CONSTANTS = {
     "ORDER_STATUS": {
         'AVAILABLE': 'AVAILABLE',
