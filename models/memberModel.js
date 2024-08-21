@@ -1,6 +1,6 @@
 // models/customerModel.js
 const mongoose = require("mongoose");
-const { VIDEO_KYC_STATUS, MEMBER_STAGE } = require("../helpers/types");
+const { VIDEO_KYC_STATUS, MEMBER_STAGE, FREE_PIN_STATUS } = require("../helpers/types");
 const memberSchema = new mongoose.Schema({
   fname: {
     type: String,
@@ -84,6 +84,15 @@ const memberSchema = new mongoose.Schema({
   freePinImage: {
     type: String,
     required: false,
+  },
+  freePinStatus: {
+    type: String,
+    enum: [
+      FREE_PIN_STATUS.REQUESTED,
+      FREE_PIN_STATUS.APPROVED,
+      FREE_PIN_STATUS.REJECTED,
+    ],
+    default: FREE_PIN_STATUS.REQUESTED,
   },
   isAdmin: {
     type: Boolean,

@@ -66,7 +66,11 @@ const memberTokenSchema = new mongoose.Schema({
     getHelp2: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "MemberToken"
-    }
+    },
+    container: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Container"
+    },
 },
     {
         timestamps: true,

@@ -8,7 +8,7 @@ class DashboardController {
         try {
             const adminId = process.env.ADMIN_ID;
             const adminTokenId = process.env.ADMIN_TOKEN_ID;
-            const totalMembers = await Member.countDocuments({_id: { $ne: adminId },});
+            const totalMembers = await Member.countDocuments({_id: { $ne: adminId }, isRegistered: true});
             const totalIds = await MemberToken.countDocuments({ memberId: { $ne: adminId },_id: { $ne: adminTokenId },});
             const totalGetHelpPending = await MemberToken.countDocuments({
                 memberId: { $ne: adminId },

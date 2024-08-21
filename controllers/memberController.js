@@ -3,12 +3,13 @@ const bcrypt = require("bcrypt");
 const Member = require("../models/memberModel");
 const MemberToken = require("../models/memberTokenModel")
 const moment = require("moment");
-const { SH_GH_TYPES, VIDEO_KYC_STATUS, MEMBER_STAGE, TRANSACTION_TYPES, PIN_STATUS, INCOME_TYPES } = require("../helpers/types");
+const { SH_GH_TYPES, VIDEO_KYC_STATUS, MEMBER_STAGE, TRANSACTION_TYPES, PIN_STATUS, INCOME_TYPES, FREE_PIN_STATUS } = require("../helpers/types");
 const LevelPrice = require("../models/levelPrice");
 const LevelIncome = require("../models/levelIncomeModel");
 const PinEnquiry = require("../models/pinEnquiryModel");
 const Settings = require("../models/settings");
 const Transaction = require("../models/transactionModel");
+const Container = require("../models/containerModel");
 const { categoryPrices } = require("../helpers/Constants");
 
 class CustomerController {
@@ -61,11 +62,11 @@ class CustomerController {
             } else if(type === "freePinRequest"){
                 const members = await Member.find({
                     freePinImage: { $ne: null, $ne: "default_free_pin_image_url" },
-                    isFollowed: false
+                    // isFollowed: false,
                 }).skip(skip).limit(limit).sort({ createdAt: -1 }).populate("referredBy").exec();
                 const totalMembers = await Member.find({
                     freePinImage: { $ne: null, $ne: "default_free_pin_image_url" },
-                    isFollowed: false
+                    // isFollowed: false,
                 }).countDocuments();
                 return res.json({ members, totalMembers });
             }
@@ -96,6 +97,87 @@ class CustomerController {
 
             res.json({ members, totalMembers });
 
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
+
+    async fetchMembersIDs(req, res) {
+        try {
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 10; 
+            const skip = (page - 1) * limit;
+            const startDate = req.query.startDate;
+            const endDate = req.query.endDate;
+            const date = req.query.date;
+
+            if(date !== "undefined") {
+                const _startDate = moment(date).set({ hour: 0, minute: 0, second: 0, millisecond: 0 }).toDate();
+                const _endDate = moment(date).set({ hour: 23, minute: 59, second: 59, millisecond: 0 }).toDate();
+                const aggregationPipeline = [
+                    { $match: { createdAt: { $gte: _startDate, $lte: _endDate } } },
+                    {
+                        $group: {
+                            _id: {
+                                memberId: "$memberId",
+                            },
+                            count: { $sum: 1 }
+                        }
+                    },
+                    { $lookup: { from: "members", localField: "_id.memberId", foreignField: "_id", as: "memberDetails"} },
+                    { $unwind: "$memberDetails" },
+                    {
+                        $project: {
+                            _id: 0,
+                            memberId: "$_id.memberId",
+                            count: 1,
+                            fname: "$memberDetails.fname",
+                            lname: "$memberDetails.lname",
+                            mobile: "$memberDetails.mobile"
+                        }
+                    },
+                ];
+            
+                const memberIds = await MemberToken.aggregate([
+                    ...aggregationPipeline,
+                    { $skip: skip },
+                    { $limit: limit }
+                ]).exec();
+            
+                const totalMemberIdsCount = await MemberToken.aggregate([
+                    ...aggregationPipeline,
+                    { $count: "totalCount" }
+                ]).exec();
+
+                const totalMemberIds = totalMemberIdsCount.length > 0 ? totalMemberIdsCount[0].totalCount : 0;
+                return res.json({ memberIds, totalMemberIds });
+            }
+
+            const _startDate = moment(startDate).set({ hour: 0, minute: 0, second: 0, millisecond: 0 }).toDate();
+            const _endDate = moment(endDate).set({ hour: 23, minute: 59, second: 59, millisecond: 0 }).toDate();
+            const aggregationPipeline = [
+                { $match: { createdAt: { $gte: _startDate, $lte: _endDate } } },
+                { $group: { _id: { createdAt: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } } }, count: { $sum: 1 } }
+                },
+                { $project: { _id: 0, createdAt: "$_id.createdAt", count: 1 } },
+                { $sort: { createdAt: 1 } }
+            ];
+
+            const memberIds = await MemberToken.aggregate([
+                ...aggregationPipeline,
+                { $skip: skip },
+                { $limit: limit }
+            ]).exec();
+
+            const totalMemberIdsCount = await MemberToken.aggregate([
+                ...aggregationPipeline,
+                { $count: "totalCount" }
+            ]).exec();
+
+            const totalMemberIds = totalMemberIdsCount.length > 0 ? totalMemberIdsCount[0].totalCount : 0;
+
+            res.json({ memberIds, totalMemberIds });
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: 'Internal Server Error' });
@@ -149,40 +231,41 @@ class CustomerController {
             const date = req.query.date || new Date();
             const type = req.query.type;
             const tag = req.query.tag
-
+            const containerId = req.query.containerId;
             const adminToken = process.env.ADMIN_TOKEN_ID || 1;
 
             const startDate = moment(date).set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
             const endDate = moment(date).set({ hour: 23, minute: 59, second: 59, millisecond: 0 });
             
-            
             let data = [];
-            if(type === "sender"){ 
+          
+            if (type === "sender") {
                 data = await MemberToken.find({
-                    _id: { $ne: adminToken }, 
+                    _id: { $ne: adminToken },
                     sendHelp: null,
+                    container: containerId,
                     createdAt: { $gte: startDate, $lte: endDate },
-                }).populate("memberId").exec()
-                
-                if(tag!=="All"){
+                }).populate("memberId").exec();
+
+                if (tag !== "All") {
                     data = data.filter((item) => {
                         return item?.memberId?.tags?.includes(tag);
                     });
                 }
-                
-            } else{
+            } else {
                 data = await MemberToken.find({
-                    _id: { $ne: adminToken }, 
-                    sendHelp: { $ne: null }, 
+                    _id: { $ne: adminToken },
+                    sendHelp: { $ne: null },
+                    container: containerId,
                     "sendHelp.status": SH_GH_TYPES.COMPLETED,
                     createdAt: { $gte: startDate, $lte: endDate },
                     $or: [
-                        { getHelp1: {$exists: false} },
-                        { getHelp2: {$exists: false} }
-                    ] 
-                }).populate("memberId").exec()
-               
-                if(tag!=="All"){
+                        { getHelp1: { $exists: false } },
+                        { getHelp2: { $exists: false } }
+                    ]
+                }).populate("memberId").exec();
+
+                if (tag !== "All") {
                     data = data.filter((item) => {
                         return item?.memberId?.tags?.includes(tag);
                     });
@@ -211,10 +294,148 @@ class CustomerController {
         }
     }
 
+    async fetchContainers(req, res) {
+        try {
+            const containers = await Container.find().exec();
+            res.status(200).json(containers);
+        }
+        catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
+
+    async createContainer(req, res) {
+        try {
+            const { date, note, isPublished } = req.body;
+            console.log(req.body);
+
+            let containerName = date;
+            let postfix = 1;
+
+            let existingContainer = await Container.findOne({ containerName });
+
+            if (existingContainer) {
+                containerName = `${date}-${postfix}`;
+                postfix++;
+                existingContainer = await Container.findOne({ containerName });
+            } else {
+                containerName = `${date}-1`;
+            }
+
+            const container = new Container({
+                containerName,
+                note,
+                isPublished,
+            });
+
+            console.log(container);
+
+            const data = container
+            
+            await container.save();
+
+            // Fetch sendHelps
+            const dateQuery = req.query.date || new Date();
+            const type = req.query.type;
+            const tag = req.query.tag;
+            const adminToken = process.env.ADMIN_TOKEN_ID || 1;
+
+            const startDate = moment(dateQuery).set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+            const endDate = moment(dateQuery).set({ hour: 23, minute: 59, second: 59, millisecond: 0 });
+
+            let sendHelps = [];
+            if (type === "sender") {
+                sendHelps = await MemberToken.find({
+                    _id: { $ne: adminToken },
+                    sendHelp: null,
+                    container: null,
+                    createdAt: { $gte: startDate, $lte: endDate },
+                }).populate("memberId").exec();
+
+                if (tag !== "All") {
+                    sendHelps = sendHelps.filter((item) => {
+                        return item?.memberId?.tags?.includes(tag);
+                    });
+                }
+            } else {
+                sendHelps = await MemberToken.find({
+                    _id: { $ne: adminToken },
+                    sendHelp: { $ne: null },
+                    container: null,
+                    "sendHelp.status": SH_GH_TYPES.COMPLETED,
+                    createdAt: { $gte: startDate, $lte: endDate },
+                    $or: [
+                        { getHelp1: { $exists: false } },
+                        { getHelp2: { $exists: false } }
+                    ]
+                }).populate("memberId").exec();
+
+                if (tag !== "All") {
+                    sendHelps = sendHelps.filter((item) => {
+                        return item?.memberId?.tags?.includes(tag);
+                    });
+                }
+
+                sendHelps = sendHelps.filter((item) => {
+                    return item?.memberId?.videoKYC?.status === VIDEO_KYC_STATUS.APPROVED;
+                });
+            }
+
+            // Update sendHelps with container ID
+            for (let sendHelp of sendHelps) {
+                sendHelp.container = container._id;
+                await sendHelp.save();
+            }
+
+            res.status(201).json({ data: data, message: "Container created" });
+        }
+        catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
+
+    async publishContainer(req, res) {
+        try {
+            const { containerName, publishDateTime, endDateTime } = req.body;
+            const container = await Container.findOne({ containerName: containerName });
+            if(!container){
+                return res.status(404).json({ message: "Container not found" });
+            }
+            container.isPublished = true;
+            container.publishDateTime = publishDateTime;
+            container.endDateTime = endDateTime;
+
+            await container.save();
+            res.status(200).json({ message: "Container published" });
+        }
+        catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
+
+    async editContainerNote(req, res) {
+        try {
+            const { containerName, note } = req.body;
+            const container = await Container.findOne({ containerName: containerName });
+            if(!container){
+                return res.status(404).json({ message: "Container not found" });
+            }
+            container.note = note;
+            await container.save();
+            res.status(200).json({ message: "Container note updated" });
+        }
+        catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
+            
     async assignSendHelp(req, res) {
         try {
-            const { senders, recipient, sendToAdmin } = await req.body;
-
+            const { senders, recipient, sendToAdmin, containerId } = await req.body;
             const foundRecipient = await MemberToken.findById({
                 _id: recipient?._id,
                 memberId: recipient?.memberId
@@ -249,6 +470,10 @@ class CustomerController {
                     status: SH_GH_TYPES.PAYMENT_PENDING,
                     assignedOn: new Date(),
                     updatedAt: new Date()
+                }
+
+                if(containerId){
+                    foundSender.container = containerId;
                 }
     
                 await foundSender.save();
@@ -323,6 +548,17 @@ class CustomerController {
             res.status(200).json({ message: "Note added" });
         } catch (error) {
             console.log("Note add error", error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
+
+    async fetchContainerMemberTokens (req, res) {
+        try {
+            const containerId = req.params.id;
+            const members = await MemberToken.find({ container: containerId }).populate("memberId").populate("sendHelp.recipient").populate("sendHelp.recipientUserId").exec();
+            res.json(members);
+        } catch (error) {
+            console.error(error);
             res.status(500).json({ message: 'Internal Server Error' });
         }
     }
@@ -510,6 +746,7 @@ class CustomerController {
             
             member.isFollowed = true;
             member.epinBalance += 1;
+            member.freePinStatus = FREE_PIN_STATUS.APPROVED;
             
             await member.save();
             res.status(200).json({ message: "Free pin unlocked" });
@@ -518,6 +755,26 @@ class CustomerController {
             res.status(500).json({ message: 'Internal Server Error' });
         }
     }
+
+    async rejectFreePin(req, res) {
+        try {
+            const { memberId } = await req.body;
+            console.log(memberId)
+            const member = await Member.findById(memberId);
+            if(!member){
+                return res.status(404).json({ message: "Member not found" });
+            }
+            if(member.freePinStatus === FREE_PIN_STATUS.APPROVED){
+                member.epinBalance -= 1;
+            }
+            member.freePinStatus = FREE_PIN_STATUS.REJECTED;
+            await member.save();
+            res.status(200).json({ message: "Free pin rejected" });
+        }catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Internal Server Error' });
+        }
+    } 
 }
 
 module.exports = new CustomerController();

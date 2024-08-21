@@ -41,6 +41,11 @@ const INCOME_TYPES = {
     CATEGORY: 'CATEGORY',
 }
 
+const FREE_PIN_STATUS = {
+    REQUESTED: 'REQUESTED',
+    APPROVED: 'APPROVED',
+    REJECTED: 'REJECTED',
+}
 
 module.exports = {
     SH_GH_TYPES,
@@ -48,5 +53,6 @@ module.exports = {
     MEMBER_STAGE,
     PIN_STATUS,
     TRANSACTION_TYPES,
-    INCOME_TYPES
+    INCOME_TYPES,
+    FREE_PIN_STATUS
 }
