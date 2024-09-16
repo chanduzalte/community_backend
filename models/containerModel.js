@@ -6,6 +6,11 @@ const containerModelSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    id: {
+      type: Number,
+      required: true,
+      default: 1,
+    },
     note: {
       type: String,
       required: false,

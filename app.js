@@ -5,6 +5,7 @@ require('dotenv').config();
 const routes = require('./routes/index'); // Import the combined routes
 const mongoose = require('mongoose');
 const cors = require('cors');
+const cronJob = require('./utils/cron-job');
 
 
 // Connect to the MongoDB database
@@ -25,6 +26,7 @@ const corsOptions = {
 app.use(express.json());
 app.use(cors(corsOptions));
 
+cronJob();
 
 // Use the combined routes under the '/api' path
 app.use('/api', routes);

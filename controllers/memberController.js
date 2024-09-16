@@ -11,6 +11,7 @@ const Settings = require("../models/settings");
 const Transaction = require("../models/transactionModel");
 const Container = require("../models/containerModel");
 const { categoryPrices } = require("../helpers/Constants");
+const { default: mongoose } = require("mongoose");
 
 class CustomerController {
 
@@ -32,69 +33,104 @@ class CustomerController {
             // Parse page and limit parameters from the query string
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 10; // Default limit is 10'
+            const searchText = req.query.query || "";
+            const searchTerms = searchText.split(' ').map(term => new RegExp(term, 'i'));
             const type = req.query.type || "all";
             // Calculate the number of documents to skip based on the page and limit
             const skip = (page - 1) * limit;
+            
+            let filterObj = {};
 
             if(type === "incompleteRegistration"){
-                const members = await Member.find({
+                filterObj = {
                     fname: null,
                     lname: null,
                     passcode: null
-                }).skip(skip).limit(limit).sort({ createdAt: -1 }).exec();
-                const totalMembers = await Member.find({
-                    fname: null,
-                    lname: null,
-                    passcode: null
-                }).countDocuments();
+                };
+                if(searchText){
+                    filterObj = {
+                        ...filterObj,
+                        $and: searchTerms.map(term => ({ 
+                            $or: [
+                                { $expr: { $regexMatch: { input: { $toString: "$mobile" }, regex: term } } }
+                            ]
+                        }))
+                    }
+                }
+                const members = await Member.find(filterObj).skip(skip).limit(limit).sort({ createdAt: -1 }).exec();
+                const totalMembers = await Member.find(filterObj).countDocuments();
                 return res.json({ members, totalMembers });
             } else if(type === "videoKYCCompleted"){
-                const members = await Member.find({
+                filterObj = {
                     "videoKYC.status": VIDEO_KYC_STATUS.APPROVED,
                     isRegistered: true
-                }).skip(skip).limit(limit).sort({ createdAt: -1 }).populate("referredBy").exec();
-                console.log(members);
-                const totalMembers = await Member.find({
-                    "videoKYC.status": VIDEO_KYC_STATUS.APPROVED,
-                    isRegistered: true
-                }).countDocuments();
+                };
+                if(searchText){
+                    filterObj = {
+                        ...filterObj,
+                        $and: searchTerms.map(term => ({
+                            $or: [
+                                { fname: term },
+                                { lname: term },
+                                { $expr: { $regexMatch: { input: { $toString: "$mobile" }, regex: term } } }
+                            ]
+                        }))
+                    }
+                }
+                const members = await Member.find(filterObj).skip(skip).limit(limit).sort({ createdAt: -1 }).populate("referredBy").exec();
+                const totalMembers = await Member.find(filterObj).countDocuments();
                 return res.json({ members, totalMembers });
             } else if(type === "freePinRequest"){
-                const members = await Member.find({
+                filterObj = {
                     freePinImage: { $ne: null, $ne: "default_free_pin_image_url" },
                     // isFollowed: false,
-                }).skip(skip).limit(limit).sort({ createdAt: -1 }).populate("referredBy").exec();
-                const totalMembers = await Member.find({
-                    freePinImage: { $ne: null, $ne: "default_free_pin_image_url" },
-                    // isFollowed: false,
-                }).countDocuments();
+                };
+                if(searchText){
+                    filterObj = {
+                        ...filterObj,
+                        $and: searchTerms.map(term => ({
+                            $or: [
+                                { fname: term },
+                                { lname: term },
+                                { $expr: { $regexMatch: { input: { $toString: "$mobile" }, regex: term } } }
+                            ]
+                        })
+                    )}
+                }
+
+                const members = await Member.find(filterObj).skip(skip).limit(limit).sort({ createdAt: -1 }).populate("referredBy").exec();
+                const totalMembers = await Member.find(filterObj).countDocuments();
                 return res.json({ members, totalMembers });
             }
 
-            const members = type === "videoKYC" ? 
-            await Member.find({ 
-                profileImage: { $ne: null },
-                "videoKYC.status": { $ne: VIDEO_KYC_STATUS.COMPLETED },
-                "videoKYC.url": { $ne: null, $ne: "default_video_kyc_url"},
-                isRegistered: true
-            }).populate("referredBy").exec()
-            :
-            await Member.find({
+            filterObj = {
                 isAdmin: false,
                 isRegistered: true
-            }).skip(skip).limit(limit).sort({ createdAt: -1 })
-                .exec();
+            };
 
-            const totalMembers = type === "videoKYC" ?
-            await Member.find({ 
-                profileImage: { $ne: null },
-                "videoKYC.status": { $ne: VIDEO_KYC_STATUS.COMPLETED },
-                "videoKYC.url": { $ne: null , $ne: "default_video_kyc_url"},
-                isRegistered: true
-            }).countDocuments()
-            :
-            await Member.find({ isAdmin: false, isRegistered: true }).countDocuments();
+            if(type === "videoKYC"){
+                filterObj = {
+                    profileImage: { $ne: null },
+                    "videoKYC.status": { $ne: VIDEO_KYC_STATUS.COMPLETED },
+                    "videoKYC.url": { $ne: null, $ne: "default_video_kyc_url" },
+                };
+            }
 
+            if(searchText){
+                filterObj = {
+                    ...filterObj,
+                    $and: searchTerms.map(term => ({
+                        $or: [
+                            { fname: term },
+                            { lname: term },
+                            { $expr: { $regexMatch: { input: { $toString: "$mobile" }, regex: term } } }
+                        ]
+                    })
+                )}
+            }
+
+            const members = await Member.find(filterObj).skip(skip).limit(limit).sort({ createdAt: -1 }).populate("referredBy").exec();
+            const totalMembers = await Member.countDocuments(filterObj);
             res.json({ members, totalMembers });
 
         } catch (error) {
@@ -308,28 +344,23 @@ class CustomerController {
     async createContainer(req, res) {
         try {
             const { date, note, isPublished } = req.body;
-            console.log(req.body);
 
             let containerName = date;
-            let postfix = 1;
+            let id = 1;
 
-            let existingContainer = await Container.findOne({ containerName });
+            let existingContainer = await Container.findOne({ containerName }).sort({ id: -1 });
 
             if (existingContainer) {
-                containerName = `${date}-${postfix}`;
-                postfix++;
-                existingContainer = await Container.findOne({ containerName });
-            } else {
-                containerName = `${date}-1`;
+                id = (existingContainer.id + 1) || 1;
             }
 
             const container = new Container({
                 containerName,
                 note,
                 isPublished,
+                id
             });
 
-            console.log(container);
 
             const data = container
             
@@ -398,14 +429,19 @@ class CustomerController {
 
     async publishContainer(req, res) {
         try {
-            const { containerName, publishDateTime, endDateTime } = req.body;
-            const container = await Container.findOne({ containerName: containerName });
+            const { containerName, containerId, publishDateTime, endDateTime } = req.body;
+            const container = await Container.findById(containerId);
             if(!container){
                 return res.status(404).json({ message: "Container not found" });
             }
+
+            // convert publishDateTime and endDateTime to IST and remove 5 hours and 30 minutes
+            const _publishDateTime = moment(publishDateTime).subtract(5, 'hours').subtract(30, 'minutes').toDate();
+            const _endDateTime = moment(endDateTime).subtract(5, 'hours').subtract(30, 'minutes').toDate();
+
             container.isPublished = true;
-            container.publishDateTime = publishDateTime;
-            container.endDateTime = endDateTime;
+            container.publishDateTime = _publishDateTime;
+            container.endDateTime = _endDateTime;
 
             await container.save();
             res.status(200).json({ message: "Container published" });
@@ -418,8 +454,8 @@ class CustomerController {
 
     async editContainerNote(req, res) {
         try {
-            const { containerName, note } = req.body;
-            const container = await Container.findOne({ containerName: containerName });
+            const { containerName, containerId, note } = req.body;
+            const container = await Container.findById(containerId);
             if(!container){
                 return res.status(404).json({ message: "Container not found" });
             }
@@ -621,15 +657,59 @@ class CustomerController {
                 return res.status(400).json({ message: "Member id required" });
             }
             const adminId = process.env.ADMIN_ID;
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 10; 
+            const skip = (page - 1) * limit;
+            const searchText = req.query.query || "";
+            const searchTerms = searchText.split(' ').map(term => new RegExp(term, 'i'));
+        
+            const _adminId = new mongoose.Types.ObjectId(adminId);
+            let filterObj = {
+                sendHelp: { $ne: null },
+                "sendHelp.recipientUserId": _adminId
+            };
+
+            if(searchText){
+                filterObj = {
+                    ...filterObj,
+                    $and: searchTerms.map(term => ({
+                        $or: [
+                            { "memberId.fname": term },
+                            { "memberId.lname": term },
+                            { $expr: { $regexMatch: { input: { $toString: "$memberId.mobile" }, regex: term } } }
+                        ]
+                    })
+                )}
+            }
+
+            let aggregateObj = [
+                { $lookup: { from: "members", localField: "memberId", foreignField: "_id", as: "memberId" } },
+                { $unwind: { path: "$memberId", preserveNullAndEmptyArrays: true } },
+                { $match: filterObj }
+            ]
+
             let data;
+            let totalGH = 0;
             if(id === adminId){
-                data = await MemberToken.find({
-                    sendHelp: { $ne: null },
-                    "sendHelp.recipientUserId": adminId,
-                }).populate("memberId").exec();
+                data = await MemberToken.aggregate([
+                    ...aggregateObj,
+                    { $sort: { createdAt: -1 } },
+                    { $skip: skip },
+                    { $limit: limit }
+                ]);
+
+                const totalGHH = await MemberToken.aggregate([
+                    ...aggregateObj,
+                    { $count: "totalCount" }
+                ]);
+
+                totalGH = totalGHH.length > 0 ? totalGHH[0].totalCount : 0;
             }
             
-            res.json(data);
+            res.json({
+                gh: data,   
+                totalGH
+            });
         }
         catch (error) {
             console.error(error);
@@ -683,12 +763,41 @@ class CustomerController {
         try {
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 10; // Default limit is 10'
+            const searchText = req.query.query || "";
+            const searchTerms = searchText.split(' ').map(term => new RegExp(term, 'i'));
             const type = req.query.type || "pinEnquiries";
-
             const skip = (page - 1) * limit;
 
-            const members = await PinEnquiry.find().skip(skip).limit(limit).sort({ createdAt: -1 }).populate("requestedBy").exec()
-            const totalMembers = await PinEnquiry.find().countDocuments();
+            const filterObj = {
+                $and: searchTerms.map(term => ({
+                    $or: [
+                        { "requestedBy.fname": term },
+                        { "requestedBy.lname": term },
+                        { $expr: { $regexMatch: { input: { $toString: "$requestedBy.mobile" }, regex: term } } }
+                    ]
+                }))
+            };
+
+            const aggregateObj = [
+                { $lookup: { from: "members", localField: "requestedBy", foreignField: "_id", as: "requestedBy" } },
+                { $unwind: { path: "$requestedBy", preserveNullAndEmptyArrays: true } },
+                { $match: filterObj }
+            ]
+
+            const members = await PinEnquiry.aggregate([
+                ...aggregateObj,
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit }
+            ]);
+
+            const totalMemberss = await PinEnquiry.aggregate([
+                ...aggregateObj,
+                { $count: "totalCount" }
+            ]);
+
+            const totalMembers = totalMemberss.length > 0 ? totalMemberss[0].totalCount : 0;
+
             res.json({ members, totalMembers });
         } catch (error) {
             console.error(error);
@@ -759,7 +868,6 @@ class CustomerController {
     async rejectFreePin(req, res) {
         try {
             const { memberId } = await req.body;
-            console.log(memberId)
             const member = await Member.findById(memberId);
             if(!member){
                 return res.status(404).json({ message: "Member not found" });
@@ -774,7 +882,88 @@ class CustomerController {
             console.error(error);
             res.status(500).json({ message: 'Internal Server Error' });
         }
-    } 
+    }
+
+    // Cron Job Functions
+    async ApproveGH() {
+        try{
+            const currentDate = moment().toISOString();
+            const filterObj = {
+                sendHelp: { $ne: null },
+                "sendHelp.status": SH_GH_TYPES.APPROVAL_PENDING,
+                container: { $ne: null },
+                "container.endDateTime": { $lte: currentDate }
+            }
+            const aggregateObj = [
+                { $lookup: { from: "members", localField: "memberId", foreignField: "_id", as: "memberId" } },
+                { $unwind: { path: "$memberId", preserveNullAndEmptyArrays: true } },
+                { $lookup: { from: "containers", localField: "container", foreignField: "_id", as: "container" } },
+                { $unwind: { path: "$container", preserveNullAndEmptyArrays: true } },
+                { $match: filterObj }
+            ]
+            const GHs = await MemberToken.aggregate([
+                ...aggregateObj
+            ]);
+
+            GHs.forEach(async (gh) => {
+                gh.sendHelp.status = SH_GH_TYPES.APPROVED;
+                gh.sendHelp.updatedAt = new Date();
+                // save the updated GH
+                await gh.save();
+                // distribute income
+                await distributeIncome(gh._id, gh?.memberId?.referredBy);
+
+                // silver silverTrigger
+                const count = await MemberToken.find({
+                    memberId: gh?.memberId?._id,
+                    sendHelp: { $ne: null },
+                    "sendHelp.status": SH_GH_TYPES.COMPLETED
+                }).countDocuments();
+                const member = await Member.findById(gh?.memberId?._id);
+                if(member?.videoKYC?.status === VIDEO_KYC_STATUS.APPROVED && count === 1){
+                    member.isSilver = true;  
+                    member.stage = MEMBER_STAGE.SILVER;
+                    await member.save();
+                    await silverTrigger(member?._id, member?.referredBy);
+                }
+            });
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    async ExprieSH() {
+        try{
+            const currentDate = moment().toISOString();
+            const filterObj = {
+                sendHelp: { $ne: null },
+                "sendHelp.status": SH_GH_TYPES.PAYMENT_PENDING,
+                "sendHelp.screenShot": { $ne: null },
+                container: { $ne: null },
+                "container.endDateTime": { $lte: currentDate }
+            }
+            const aggregateObj = [
+                { $lookup: { from: "members", localField: "memberId", foreignField: "_id", as: "memberId" } },
+                { $unwind: { path: "$memberId", preserveNullAndEmptyArrays: true } },
+                { $lookup: { from: "containers", localField: "container", foreignField: "_id", as: "container" } },
+                { $unwind: { path: "$container", preserveNullAndEmptyArrays: true } },
+                { $match: filterObj }
+            ]
+
+            const SHs = await MemberToken.aggregate([
+                ...aggregateObj
+            ]);
+
+            SHs.forEach(async (sh) => {
+                sh.sendHelp.status = SH_GH_TYPES.EXPIRED;
+                sh.sendHelp.updatedAt = new Date();
+                await sh.save();
+            });
+        } catch (error) {
+            console.log(error);
+        }
+    }
 }
 
 module.exports = new CustomerController();
@@ -848,7 +1037,7 @@ const distributeIncome = async (sourceToken, referredBy) => {
 };
 
 
-const silverTrigger = async (memberId, referredBy) => {
+silverTrigger = async (memberId, referredBy) => {
     try {
         let referreingMember = await Member.findById(referredBy);
 
