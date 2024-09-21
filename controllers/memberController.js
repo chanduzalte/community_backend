@@ -264,15 +264,15 @@ class CustomerController {
     async fetchSendHelps(req, res) {
         try {
             // take out date and type from query string
-            const date = req.query.date || new Date();
+            const date = req.query.date || "";
             const type = req.query.type;
             const tag = req.query.tag
             const containerId = req.query.containerId;
             const adminToken = process.env.ADMIN_TOKEN_ID || 1;
-
+            console.log(date)
             const startDate = moment(date).set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
             const endDate = moment(date).set({ hour: 23, minute: 59, second: 59, millisecond: 0 });
-            
+            console.log(startDate, endDate);
             let data = [];
           
             if (type === "sender") {
@@ -292,7 +292,7 @@ class CustomerController {
                 data = await MemberToken.find({
                     _id: { $ne: adminToken },
                     sendHelp: { $ne: null },
-                    container: containerId,
+                    // container: containerId,
                     "sendHelp.status": SH_GH_TYPES.COMPLETED,
                     createdAt: { $gte: startDate, $lte: endDate },
                     $or: [
