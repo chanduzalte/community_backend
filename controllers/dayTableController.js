@@ -22,7 +22,7 @@ class DayTableController {
                 day: day,
                 date: formattedDate,
                 systemIdCreationLimit: systemIdCreationLimit,
-                published: published,
+                published: true,
             });
             res.status(200).json(savedDayTable);
         } catch (err) {

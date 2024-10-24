@@ -71,6 +71,11 @@ const memberTokenSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Container"
     },
+    amount: {
+        type: Number,
+        default: 0,
+        required: true
+    }
 },
     {
         timestamps: true,

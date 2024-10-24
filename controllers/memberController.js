@@ -332,7 +332,7 @@ class CustomerController {
 
     async fetchContainers(req, res) {
         try {
-            const containers = await Container.find().exec();
+            const containers = await Container.find().sort({ createdAt: -1 }).exec();
             res.status(200).json(containers);
         }
         catch (error) {
@@ -472,6 +472,7 @@ class CustomerController {
     async assignSendHelp(req, res) {
         try {
             const { senders, recipient, sendToAdmin, containerId } = await req.body;
+            const sendHelpPrice = process.env.SEND_HELP_PRICE || 1000;
             const foundRecipient = await MemberToken.findById({
                 _id: recipient?._id,
                 memberId: recipient?.memberId
@@ -511,7 +512,7 @@ class CustomerController {
                 if(containerId){
                     foundSender.container = containerId;
                 }
-    
+                foundSender.amount = parseInt(sendHelpPrice)
                 await foundSender.save();
 
                 if(!sendToAdmin){
@@ -887,12 +888,12 @@ class CustomerController {
     // Cron Job Functions
     async ApproveGH() {
         try{
-            const currentDate = moment().toISOString();
+            const _date = moment().subtract(48, 'hours').toISOString();
             const filterObj = {
                 sendHelp: { $ne: null },
                 "sendHelp.status": SH_GH_TYPES.APPROVAL_PENDING,
                 container: { $ne: null },
-                "container.endDateTime": { $lte: currentDate }
+                "container.endDateTime": { $lte: _date }
             }
             const aggregateObj = [
                 { $lookup: { from: "members", localField: "memberId", foreignField: "_id", as: "memberId" } },
@@ -935,13 +936,13 @@ class CustomerController {
 
     async ExprieSH() {
         try{
-            const currentDate = moment().toISOString();
+            const _date = moment().subtract(48, 'hours').toISOString();
             const filterObj = {
                 sendHelp: { $ne: null },
                 "sendHelp.status": SH_GH_TYPES.PAYMENT_PENDING,
                 "sendHelp.screenShot": { $ne: null },
                 container: { $ne: null },
-                "container.endDateTime": { $lte: currentDate }
+                "container.endDateTime": { $lte: _date }
             }
             const aggregateObj = [
                 { $lookup: { from: "members", localField: "memberId", foreignField: "_id", as: "memberId" } },
